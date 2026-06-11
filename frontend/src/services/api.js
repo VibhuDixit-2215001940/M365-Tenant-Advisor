@@ -15,33 +15,55 @@ async function apiFetch(path, options = {}) {
   if (!res.ok || !json.success) {
     throw new Error(json.error || `HTTP ${res.status}`);
   }
-  return json.data;
+  return json;
 }
 
 // ── Tenant API ───────────────────────────────────────────────
 
 /** Fetch all onboarded tenants (summary). */
 export async function fetchTenants() {
-  return apiFetch("/tenants");
+  const result = await apiFetch("/tenants");
+  return result.data;
 }
 
 /** Fetch full tenant data by ID. */
 export async function fetchTenant(tenantId) {
-  return apiFetch(`/tenants/${tenantId}`);
+  const result = await apiFetch(`/tenants/${tenantId}`);
+  return result.data;
+}
+
+/**
+ * Onboard a new tenant with Azure credentials.
+ * @returns {{ id, displayName, domain, isNew, message }}
+ */
+export async function onboardTenant(tenantId, clientId, clientSecret) {
+  const result = await apiFetch("/tenants/onboard", {
+    method: "POST",
+    body: JSON.stringify({ tenantId, clientId, clientSecret }),
+  });
+  return { ...result.data, message: result.message };
+}
+
+/** Remove a tenant by ID. */
+export async function removeTenant(tenantId) {
+  const result = await apiFetch(`/tenants/${tenantId}`, {
+    method: "DELETE",
+  });
+  return result;
 }
 
 // ── Scan API ─────────────────────────────────────────────────
 
 /**
  * Start a tenant scan.
- * @returns {Promise<string>} scanId
+ * @returns {Promise<{ scanId, mode }>}
  */
 export async function startScan(tenantId) {
-  const data = await apiFetch("/scans/start", {
+  const result = await apiFetch("/scans/start", {
     method: "POST",
     body: JSON.stringify({ tenantId }),
   });
-  return data.scanId;
+  return { scanId: result.scanId, mode: result.mode };
 }
 
 /**
@@ -77,10 +99,12 @@ export function subscribeScanProgress(scanId, onLog, onDone) {
 
 /** Fetch completed scan results. */
 export async function fetchScanResults(scanId) {
-  return apiFetch(`/scans/${scanId}/results`);
+  const result = await apiFetch(`/scans/${scanId}/results`);
+  return result.data;
 }
 
 /** Check API health. */
 export async function fetchHealth() {
-  return apiFetch("/health");
+  const result = await apiFetch("/health");
+  return result.data;
 }

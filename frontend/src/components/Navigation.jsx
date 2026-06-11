@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, RefreshCw, Cpu } from 'lucide-react';
+import { ShieldCheck, RefreshCw, Plus } from 'lucide-react';
 
 export default function Navigation({ 
   currentTab, 
@@ -8,7 +8,8 @@ export default function Navigation({
   onTenantChange, 
   mockTenants, 
   isScanning, 
-  onTriggerScan 
+  onTriggerScan,
+  onAddTenant
 }) {
   return (
     <header className="nav-header">
@@ -50,7 +51,7 @@ export default function Navigation({
         </button>
       </nav>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <select 
           className="tenant-selector"
           value={activeTenantId}
@@ -59,10 +60,22 @@ export default function Navigation({
         >
           {Object.values(mockTenants).map(tenant => (
             <option key={tenant.id} value={tenant.id}>
-              {tenant.displayName} ({tenant.domain})
+              {tenant.displayName} ({tenant.domain}){tenant.isReal ? ' ★' : ''}
             </option>
           ))}
         </select>
+
+        {/* Add Tenant Button */}
+        <button 
+          className="btn-secondary"
+          onClick={onAddTenant}
+          disabled={isScanning}
+          style={{ padding: '8px 12px', fontSize: '0.82rem', gap: '5px' }}
+          title="Onboard a new M365 tenant"
+        >
+          <Plus size={14} />
+          Add Tenant
+        </button>
 
         <button 
           className="btn-primary" 

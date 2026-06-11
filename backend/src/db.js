@@ -207,10 +207,14 @@ const tenants = { ...seedTenants };
 // Active scan jobs: { [scanId]: { tenantId, status, startedAt, completedAt, logs: [] } }
 const scans = {};
 
-// ── Helpers ─────────────────────────────────────────────────
+// Tenant credentials (in-memory — NOT persisted across restarts)
+// { [tenantId]: { azureTenantId, clientId, clientSecret } }
+const credentials = {};
+
+// ── Tenant CRUD ─────────────────────────────────────────────
 export function getAllTenants() {
-  return Object.values(tenants).map(({ id, displayName, domain, healthScore, lastScanAt, metrics }) => ({
-    id, displayName, domain, healthScore, lastScanAt, metrics,
+  return Object.values(tenants).map(({ id, displayName, domain, healthScore, lastScanAt, metrics, isReal }) => ({
+    id, displayName, domain, healthScore, lastScanAt, metrics, isReal: !!isReal,
   }));
 }
 
@@ -218,6 +222,79 @@ export function getTenantById(id) {
   return tenants[id] || null;
 }
 
+/**
+ * Add a new real tenant from Graph API onboarding.
+ */
+export function addTenant(tenantData) {
+  const id = tenantData.id;
+  tenants[id] = {
+    id,
+    displayName: tenantData.displayName || `Tenant ${id.substring(0, 8)}`,
+    domain: tenantData.domain || id,
+    onboardedAt: new Date().toISOString(),
+    lastScanAt: null,
+    healthScore: 0,
+    isReal: true,
+    metrics: {
+      users: 0,
+      devices: 0,
+      licensesTotal: 0,
+      licensesAssigned: 0,
+      potentialSavingsMonthly: 0,
+      potentialSavingsAnnual: 0,
+    },
+    licensing: { currentLicenses: [], recommendations: [] },
+    security: { score: 0, findings: [] },
+    costLeakage: { items: [] },
+    aiSummary: {
+      overallHealth: "Scan not yet completed. Run a scan to generate the AI advisory report.",
+      costAnalysis: "",
+      securityAnalysis: "",
+      recommendations: [],
+    },
+  };
+  return tenants[id];
+}
+
+/**
+ * Remove a tenant by ID.
+ */
+export function removeTenant(id) {
+  if (tenants[id]) {
+    delete tenants[id];
+    delete credentials[id];
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Update a tenant's data after a real scan.
+ */
+export function updateTenantData(id, data) {
+  if (!tenants[id]) return null;
+  Object.assign(tenants[id], data, { lastScanAt: new Date().toISOString() });
+  return tenants[id];
+}
+
+// ── Credential Management ────────────────────────────────────
+export function storeTenantCredentials(tenantId, creds) {
+  credentials[tenantId] = {
+    azureTenantId: creds.azureTenantId,
+    clientId: creds.clientId,
+    clientSecret: creds.clientSecret,
+  };
+}
+
+export function getTenantCredentials(tenantId) {
+  return credentials[tenantId] || null;
+}
+
+export function hasCredentials(tenantId) {
+  return !!credentials[tenantId];
+}
+
+// ── Scan Management ─────────────────────────────────────────
 export function createScan(scanId, tenantId) {
   scans[scanId] = {
     id: scanId,

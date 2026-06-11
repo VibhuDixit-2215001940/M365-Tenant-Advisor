@@ -5,6 +5,7 @@ import LicenseOptimization from './pages/LicenseOptimization';
 import SecurityAnalysis from './pages/SecurityAnalysis';
 import CostLeakage from './pages/CostLeakage';
 import AISummary from './pages/AISummary';
+import OnboardTenant from './pages/OnboardTenant';
 import ScanProgress from './components/ScanProgress';
 import { mockTenants } from './mockData';
 import { fetchTenants, fetchTenant, startScan } from './services/api';
@@ -15,73 +16,77 @@ export default function App() {
   const [isScanning, setIsScanning] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
   const [currentScanId, setCurrentScanId] = useState(null);
+  const [scanMode, setScanMode] = useState('simulation'); // 'live' | 'simulation'
+  const [showOnboard, setShowOnboard] = useState(false);
 
-  // Tenant data — seeded from mockData, optionally refreshed from backend
+  // Tenant data — seeded from mockData, augmented with backend real tenants
   const [tenantsData, setTenantsData] = useState(mockTenants);
   const [backendOnline, setBackendOnline] = useState(false);
 
-  // On mount: try to load tenant data from backend; fall back to mock silently
-  useEffect(() => {
-    const loadFromBackend = async () => {
-      try {
-        const list = await fetchTenants();
-        if (list && list.length > 0) {
-          setBackendOnline(true);
-          // Fetch full data for each tenant
-          const fullData = {};
-          await Promise.all(
-            list.map(async (t) => {
-              try {
-                const full = await fetchTenant(t.id);
-                fullData[t.id] = full;
-              } catch (_) {
-                fullData[t.id] = mockTenants[t.id] || t;
-              }
-            })
-          );
-          setTenantsData(fullData);
-        }
-      } catch (_) {
-        // Backend not running — silently use mock data
-        setBackendOnline(false);
+  // Load tenants from backend on mount (and after onboarding)
+  const loadTenants = async () => {
+    try {
+      const list = await fetchTenants();
+      if (list && list.length > 0) {
+        setBackendOnline(true);
+        const fullData = {};
+        await Promise.all(
+          list.map(async (t) => {
+            try {
+              const full = await fetchTenant(t.id);
+              fullData[t.id] = full;
+            } catch (_) {
+              fullData[t.id] = mockTenants[t.id] || t;
+            }
+          })
+        );
+        setTenantsData(fullData);
       }
-    };
-    loadFromBackend();
+    } catch (_) {
+      setBackendOnline(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTenants();
   }, []);
 
   // Active Tenant
   const activeTenant = tenantsData[activeTenantId] || mockTenants[activeTenantId];
 
-  // Handler for tenant switch
+  // Tenant switch
   const handleTenantChange = (tenantId) => {
     setActiveTenantId(tenantId);
     setCurrentTab('dashboard');
   };
 
-  // Handler for trigger scan — uses backend SSE if online, otherwise timer simulation
+  // Trigger scan
   const handleTriggerScan = async () => {
     setIsScanning(true);
     setShowProgress(true);
 
     if (backendOnline) {
       try {
-        const scanId = await startScan(activeTenantId);
+        const { scanId, mode } = await startScan(activeTenantId);
         setCurrentScanId(scanId);
+        setScanMode(mode || 'simulation');
       } catch (_) {
-        // Backend call failed mid-session — fall through to simulation mode
         setCurrentScanId(null);
+        setScanMode('simulation');
       }
     } else {
       setCurrentScanId(null);
+      setScanMode('simulation');
     }
   };
 
+  // Scan complete — refresh tenant data
   const handleScanComplete = async () => {
     setIsScanning(false);
     setShowProgress(false);
     setCurrentScanId(null);
+    setScanMode('simulation');
 
-    // Refresh tenant data from backend after scan completes
     if (backendOnline) {
       try {
         const fresh = await fetchTenant(activeTenantId);
@@ -92,17 +97,25 @@ export default function App() {
     setCurrentTab('dashboard');
   };
 
+  // Onboarding success — refresh tenants and switch to new one
+  const handleOnboardSuccess = async (newTenantId, displayName) => {
+    setShowOnboard(false);
+    await loadTenants();
+    setActiveTenantId(newTenantId);
+    setCurrentTab('dashboard');
+  };
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Dynamic Background Blobs */}
+      {/* Background Blobs */}
       <div className="bg-blobs">
         <div className="blob blob-1" />
         <div className="blob blob-2" />
         <div className="blob blob-3" />
       </div>
 
-      {/* Backend status indicator (subtle pill) */}
-      {backendOnline && (
+      {/* Backend status pill */}
+      {backendOnline && !showOnboard && (
         <div style={{
           position: 'fixed', top: '10px', right: '16px', zIndex: 9999,
           fontSize: '0.68rem', fontFamily: 'var(--font-mono)',
@@ -110,6 +123,7 @@ export default function App() {
           border: '1px solid rgba(16, 185, 129, 0.3)',
           color: '#10b981', padding: '3px 10px', borderRadius: '20px',
           display: 'flex', alignItems: 'center', gap: '5px',
+          pointerEvents: 'none',
         }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
           API Connected
@@ -117,25 +131,41 @@ export default function App() {
       )}
 
       {/* Navigation */}
-      <Navigation
-        currentTab={currentTab}
-        setCurrentTab={setCurrentTab}
-        activeTenantId={activeTenantId}
-        onTenantChange={handleTenantChange}
-        mockTenants={tenantsData}
-        isScanning={isScanning}
-        onTriggerScan={handleTriggerScan}
-      />
+      {!showOnboard && (
+        <Navigation
+          currentTab={currentTab}
+          setCurrentTab={setCurrentTab}
+          activeTenantId={activeTenantId}
+          onTenantChange={handleTenantChange}
+          mockTenants={tenantsData}
+          isScanning={isScanning}
+          onTriggerScan={handleTriggerScan}
+          onAddTenant={() => setShowOnboard(true)}
+        />
+      )}
 
       {/* Main Page Area */}
       <main className="app-container">
-        {showProgress ? (
+        {/* Onboarding overlay */}
+        {showOnboard && (
+          <OnboardTenant
+            onSuccess={handleOnboardSuccess}
+            onCancel={() => setShowOnboard(false)}
+          />
+        )}
+
+        {/* Scan progress */}
+        {!showOnboard && showProgress && (
           <ScanProgress
             scanId={currentScanId}
+            scanMode={scanMode}
             tenantName={activeTenant?.displayName}
             onScanComplete={handleScanComplete}
           />
-        ) : (
+        )}
+
+        {/* Main tabs */}
+        {!showOnboard && !showProgress && (
           <>
             {currentTab === 'dashboard' && (
               <Dashboard tenant={activeTenant} onNavigate={setCurrentTab} />

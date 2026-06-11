@@ -30,11 +30,13 @@ const SIMULATION_LOGS = [
 /**
  * ScanProgress component
  * Props:
- *   scanId      — if provided, connects to real SSE backend stream
- *   tenantName  — display name for the header
+ *   scanId         — if provided, connects to real SSE backend stream
+ *   scanMode       — 'live' | 'simulation'
+ *   tenantName     — display name for the header
  *   onScanComplete — called when scan finishes
  */
-export default function ScanProgress({ scanId, tenantName, onScanComplete }) {
+export default function ScanProgress({ scanId, scanMode = 'simulation', tenantName, onScanComplete }) {
+  const isLive = scanMode === 'live';
   const [logs, setLogs] = useState([]);
   const [progress, setProgress] = useState(0);
   const [statusLabel, setStatusLabel] = useState('Ingesting Telemetry Data');
@@ -131,11 +133,29 @@ export default function ScanProgress({ scanId, tenantName, onScanComplete }) {
         <h2 style={{ fontSize: '1.8rem', marginBottom: '8px' }}>
           Scanning M365 Tenant
         </h2>
+        {/* Live vs Demo badge */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+            padding: '3px 10px', borderRadius: '20px', fontSize: '0.72rem',
+            fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
+            background: isLive ? 'rgba(48, 209, 88, 0.12)' : 'rgba(var(--accent-orange-rgb), 0.12)',
+            border: isLive ? '1px solid rgba(48, 209, 88, 0.3)' : '1px solid rgba(var(--accent-orange-rgb), 0.3)',
+            color: isLive ? '#30d158' : 'var(--accent-orange)',
+          }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%', display: 'inline-block',
+              background: isLive ? '#30d158' : 'var(--accent-orange)',
+              animation: isLive ? 'pulse 1.5s infinite' : 'none',
+            }} />
+            {isLive ? 'Live Scan — Real Data' : 'Demo Mode — Simulated'}
+          </span>
+        </div>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
           {tenantName ? `Analyzing ${tenantName}` : 'Retrieving directory configuration and calculating optimization metrics...'}
         </p>
         {scanId && (
-          <p style={{ color: 'var(--text-muted, rgba(255,255,255,0.35))', fontSize: '0.72rem', fontFamily: 'var(--font-mono)', marginTop: '6px' }}>
+          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.72rem', fontFamily: 'var(--font-mono)', marginTop: '6px' }}>
             Job ID: {scanId}
           </p>
         )}
@@ -166,7 +186,7 @@ export default function ScanProgress({ scanId, tenantName, onScanComplete }) {
           </div>
           <div className="terminal-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Terminal size={12} />
-            <span>scan_orchestrator.js{scanId ? ' — live' : ' — simulation'}</span>
+            <span>scan_orchestrator.js — {isLive ? 'live graph api' : 'simulation'}</span>
           </div>
           <div style={{ width: '42px' }} />
         </div>
