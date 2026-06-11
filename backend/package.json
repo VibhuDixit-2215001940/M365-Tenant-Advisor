@@ -1,0 +1,20 @@
+{
+  "name": "m365-tenant-advisor-backend",
+  "version": "1.0.0",
+  "description": "M365 Tenant Advisor API Backend (Express + SSE)",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "uuid": "^11.0.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
